@@ -1,6 +1,7 @@
 package com.tp1methodesagiles.gestiondessalles;
 
 import com.example.salles.dto.ReservationActionResponse;
+import com.example.salles.dto.SalleAffectationRequest;
 import com.example.salles.entity.Reservation;
 import com.example.salles.entity.Salle;
 import com.example.salles.entity.Utilisateur;
@@ -99,12 +100,51 @@ class ReservationServiceTest {
         assertNull(response.alternative());
     }
 
+    @Test
+    void modifieSalleAttribueeSansConflit() {
+        Reservation reservation = reservation(1, 10, "CONFIRMEE");
+        Salle ancienneSalle = salle(10, "A1", false);
+        Salle nouvelleSalle = salle(11, "B1", true);
+        when(reservationRepo.findByIdForUpdate(1)).thenReturn(Optional.of(reservation));
+        when(salleRepo.findByIdForUpdate(11)).thenReturn(Optional.of(nouvelleSalle));
+        when(salleRepo.findByIdForUpdate(10)).thenReturn(Optional.of(ancienneSalle));
+        when(reservationRepo.existsConflitExcluding(11, reservation.getDateDebut(),
+                reservation.getDateFin(), reservation.getId())).thenReturn(false);
+        when(reservationRepo.existsBySalleIdAndStatut(10, "CONFIRMEE")).thenReturn(false);
+        when(reservationRepo.save(any(Reservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(salleRepo.save(any(Salle.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(salleRepo.findById(11)).thenReturn(Optional.of(nouvelleSalle));
+        mockUtilisateurLookup(reservation);
+
+        ReservationActionResponse response = service.modifierSalle(1, new SalleAffectationRequest(11));
+
+        assertEquals(11, response.reservation().salleId());
+        assertEquals(false, nouvelleSalle.getDisponible());
+        assertEquals(true, ancienneSalle.getDisponible());
+    }
+
+    @Test
+    void rejetteModificationSalleEnCasDeConflit() {
+        Reservation reservation = reservation(1, 10, "CONFIRMEE");
+        Salle nouvelleSalle = salle(11, "B1", true);
+        when(reservationRepo.findByIdForUpdate(1)).thenReturn(Optional.of(reservation));
+        when(salleRepo.findByIdForUpdate(11)).thenReturn(Optional.of(nouvelleSalle));
+        when(reservationRepo.existsConflitExcluding(11, reservation.getDateDebut(),
+                reservation.getDateFin(), reservation.getId())).thenReturn(true);
+
+        assertThrows(BusinessException.class, () -> service.modifierSalle(1, new SalleAffectationRequest(11)));
+    }
+
     private void mockViewLookups(Reservation reservation, Salle salle) {
+        when(salleRepo.findById(reservation.getSalleId())).thenReturn(Optional.of(salle));
+        mockUtilisateurLookup(reservation);
+    }
+
+    private void mockUtilisateurLookup(Reservation reservation) {
         Utilisateur utilisateur = new Utilisateur();
         utilisateur.setId(reservation.getUtilisateurId());
         utilisateur.setPrenom("Ada");
         utilisateur.setNom("Lovelace");
-        when(salleRepo.findById(reservation.getSalleId())).thenReturn(Optional.of(salle));
         when(utilisateurRepo.findById(reservation.getUtilisateurId())).thenReturn(Optional.of(utilisateur));
     }
 

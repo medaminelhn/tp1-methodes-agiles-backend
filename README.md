@@ -22,6 +22,7 @@ Permettre a une secretaire de consulter, filtrer, accepter ou refuser les demand
 - Refus d'une reservation en attente.
 - Verification backend des conflits de creneaux.
 - Proposition d'une salle ou d'un creneau alternatif si possible.
+- Modification de la salle attribuee a une reservation.
 - Affichage des messages de succes et d'erreur cote interface.
 
 ## Backend Spring Boot
@@ -51,12 +52,19 @@ Permettre a une secretaire de consulter, filtrer, accepter ou refuser les demand
   - Passe la reservation en `REFUSEE`.
   - Retourne une alternative si elle existe.
 
+- `PATCH /api/reservations/{id}/salle`
+  - Modifie la salle attribuee.
+  - Verifie la disponibilite de la nouvelle salle.
+  - Verifie les conflits de creneaux.
+  - Met a jour l'etat des salles si la reservation est confirmee.
+
 ### Regles metier
 
 - Une reservation ne peut etre acceptee que si elle est en `EN_ATTENTE`.
 - Une reservation confirmee ne peut pas etre refusee directement.
 - Une reservation confirmee bloque le creneau de sa salle.
 - Le backend verifie toujours les conflits avant confirmation.
+- Le backend verifie aussi les conflits avant modification de salle.
 - Le controle frontend ne remplace pas la validation backend.
 - Les creneaux restent fixes a 2 heures, comme prevu par le schema SQL.
 
@@ -94,6 +102,7 @@ Le placeholder Angular initial a ete remplace par une interface de gestion des r
 - Badges de statut.
 - Panneau de details.
 - Boutons `Accepter` et `Refuser`.
+- Selecteur pour modifier la salle attribuee.
 - Zone d'affichage des messages.
 - Bloc d'affichage d'une alternative proposee.
 
@@ -103,6 +112,7 @@ Le placeholder Angular initial a ete remplace par une interface de gestion des r
 - `GET /api/reservations`
 - `PATCH /api/reservations/{id}/accepter`
 - `PATCH /api/reservations/{id}/refuser`
+- `PATCH /api/reservations/{id}/salle`
 
 Le `HttpClient` Angular a ete active dans `app.config.ts`.
 
@@ -139,6 +149,8 @@ Cas couverts :
 - refus d'une reservation ;
 - rejet d'une confirmation en cas de conflit ;
 - disponibilite ou absence d'une alternative.
+- modification de la salle attribuee ;
+- rejet de modification en cas de conflit.
 
 ## Fichiers modifies ou ajoutes
 
@@ -154,6 +166,7 @@ Cas couverts :
 - `ReservationView.java`
 - `AlternativeReservation.java`
 - `ReservationActionResponse.java`
+- `SalleAffectationRequest.java`
 - `ReservationServiceTest.java`
 
 ### Frontend
@@ -209,4 +222,3 @@ cd "tp1-methodes-agiles-frontend/tp1-methodes-agiles-front"
 npm install
 npm run build
 ```
-

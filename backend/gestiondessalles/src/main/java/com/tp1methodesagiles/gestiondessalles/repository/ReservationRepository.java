@@ -22,6 +22,18 @@ public interface ReservationRepository extends JpaRepository<Reservation, Intege
                           @Param("debut") LocalDateTime debut,
                           @Param("fin") LocalDateTime fin);
 
+    @Query("""
+        select count(r) > 0 from Reservation r
+        where r.salleId = :salleId and r.statut = 'CONFIRMEE' and r.id <> :reservationId
+          and r.dateDebut < :fin and r.dateFin > :debut
+        """)
+    boolean existsConflitExcluding(@Param("salleId") Integer salleId,
+                                   @Param("debut") LocalDateTime debut,
+                                   @Param("fin") LocalDateTime fin,
+                                   @Param("reservationId") Integer reservationId);
+
+    boolean existsBySalleIdAndStatut(Integer salleId, String statut);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Reservation r where r.id = :id")
     Optional<Reservation> findByIdForUpdate(@Param("id") Integer id);

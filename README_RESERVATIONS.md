@@ -16,6 +16,7 @@ La fonctionnalite permet a une secretaire de consulter les demandes de reservati
 - Acceptation d'une reservation en attente.
 - Refus d'une reservation en attente.
 - Proposition d'une alternative si une salle ou un creneau disponible est trouve.
+- Modification de la salle attribuee a une reservation.
 - Messages visibles en cas de succes ou d'erreur.
 - Validation backend pour empecher les doubles reservations.
 - Verrouillage pessimiste cote backend pendant les actions critiques afin de limiter les conflits lors de confirmations simultanees.
@@ -65,6 +66,12 @@ Dans `ReservationController` :
   - Passe la reservation en `REFUSEE`.
   - Retourne une alternative disponible si les donnees permettent d'en trouver une.
 
+- `PATCH /api/reservations/{id}/salle`
+  - Modifie la salle attribuee a une reservation.
+  - Verifie que la nouvelle salle est disponible.
+  - Verifie qu'aucune reservation confirmee ne chevauche le meme creneau dans la nouvelle salle.
+  - Met a jour l'etat des salles si la reservation est deja confirmee.
+
 ### DTO ajoutes
 
 - `ReservationView`
@@ -87,6 +94,7 @@ Dans `ReservationController` :
   - `dateDebut < finDemandee`
   - `dateFin > debutDemande`
 - Seules les reservations `CONFIRMEE` bloquent un creneau.
+- Le changement de salle attribuee applique les memes controles de conflit.
 - Les creneaux restent fixes a 2 heures, conformement a la contrainte SQL existante.
 - En cas de conflit ou d'indisponibilite, le service cherche :
   - d'abord une autre salle disponible au meme creneau ;
@@ -127,6 +135,7 @@ Le placeholder Angular initial a ete remplace par un ecran de gestion des reserv
 - Badge visuel de statut.
 - Panneau de details.
 - Boutons `Accepter` et `Refuser` uniquement si la reservation est en attente.
+- Selecteur pour modifier la salle attribuee.
 - Affichage d'une alternative si le backend en retourne une.
 - Affichage clair des messages d'erreur et de succes.
 
@@ -138,6 +147,7 @@ Dans `app.component.ts` :
 - `GET /api/reservations`
 - `PATCH /api/reservations/{id}/accepter`
 - `PATCH /api/reservations/{id}/refuser`
+- `PATCH /api/reservations/{id}/salle`
 
 Le `HttpClient` Angular a ete active dans `app.config.ts` avec `provideHttpClient()`.
 
@@ -176,6 +186,8 @@ Il couvre :
 - refus d'une reservation avec alternative disponible ;
 - rejet d'une confirmation en cas de conflit sans alternative ;
 - refus d'une reservation sans alternative disponible.
+- modification de salle attribuee sans conflit ;
+- rejet de modification de salle en cas de conflit.
 
 ## Fichiers principaux modifies
 
@@ -191,6 +203,7 @@ Il couvre :
 - `ReservationView.java`
 - `AlternativeReservation.java`
 - `ReservationActionResponse.java`
+- `SalleAffectationRequest.java`
 - `ReservationServiceTest.java`
 
 ### Frontend
@@ -244,4 +257,3 @@ cd "tp1-methodes-agiles-frontend/tp1-methodes-agiles-front"
 npm install
 npm run build
 ```
-

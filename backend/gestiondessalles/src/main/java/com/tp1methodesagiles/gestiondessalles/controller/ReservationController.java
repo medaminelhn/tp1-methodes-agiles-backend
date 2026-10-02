@@ -3,6 +3,7 @@ package com.example.salles.controller;
 import com.example.salles.dto.ReservationRequest;
 import com.example.salles.dto.ReservationActionResponse;
 import com.example.salles.dto.ReservationView;
+import com.example.salles.dto.SalleAffectationRequest;
 import com.example.salles.dto.Solde;
 import com.example.salles.entity.Reservation;
 import com.example.salles.service.ReservationService;
@@ -60,5 +61,11 @@ public class ReservationController {
     @PatchMapping("/reservations/{id}/refuser")
     public ReservationActionResponse refuser(@PathVariable Integer id) {
         return service.refuser(id);
+    }
+
+    @PatchMapping("/reservations/{id}/salle")
+    public ReservationActionResponse modifierSalle(@PathVariable Integer id,
+                                                   @RequestBody SalleAffectationRequest req) {
+        return service.modifierSalle(id, req);
     }
 }

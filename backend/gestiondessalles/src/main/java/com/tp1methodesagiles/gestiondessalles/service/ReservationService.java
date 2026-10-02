@@ -5,6 +5,7 @@ import com.example.salles.dto.AlternativeReservation;
 import com.example.salles.dto.ReservationActionResponse;
 import com.example.salles.dto.ReservationRequest;
 import com.example.salles.dto.ReservationView;
+import com.example.salles.dto.SalleAffectationRequest;
 import com.example.salles.dto.Solde;
 import com.example.salles.entity.Reservation;
 import com.example.salles.entity.Salle;
@@ -185,6 +186,44 @@ public class ReservationService {
         return new ReservationActionResponse(toView(saved), alternative, message);
     }
 
+    @Transactional
+    public ReservationActionResponse modifierSalle(Integer reservationId, SalleAffectationRequest req) {
+        if (req.salleId() == null) {
+            throw new BusinessException("Selectionnez une salle.");
+        }
+
+        Reservation reservation = reservationRepo.findByIdForUpdate(reservationId)
+                .orElseThrow(() -> new BusinessException("Reservation introuvable."));
+        if (STATUT_REFUSEE.equalsIgnoreCase(reservation.getStatut())) {
+            throw new BusinessException("La salle d'une reservation refusee ne peut pas etre modifiee.");
+        }
+        if (Objects.equals(reservation.getSalleId(), req.salleId())) {
+            return new ReservationActionResponse(toView(reservation), null, "La reservation utilise deja cette salle.");
+        }
+
+        Integer ancienneSalleId = reservation.getSalleId();
+        Salle nouvelleSalle = salleRepo.findByIdForUpdate(req.salleId())
+                .orElseThrow(() -> new BusinessException("Salle introuvable."));
+        if (!Boolean.TRUE.equals(nouvelleSalle.getDisponible())) {
+            throw new BusinessException("La salle " + nouvelleSalle.getNom() + " n'est pas disponible.");
+        }
+        if (reservationRepo.existsConflitExcluding(req.salleId(), reservation.getDateDebut(),
+                reservation.getDateFin(), reservation.getId())) {
+            throw new BusinessException("Cette salle a deja une reservation confirmee sur ce creneau.");
+        }
+
+        reservation.setSalleId(req.salleId());
+        Reservation saved = reservationRepo.save(reservation);
+
+        if (STATUT_CONFIRMEE.equalsIgnoreCase(saved.getStatut())) {
+            nouvelleSalle.setDisponible(false);
+            salleRepo.save(nouvelleSalle);
+            libererSalleSiPossible(ancienneSalleId);
+        }
+
+        return new ReservationActionResponse(toView(saved), null, "Salle attribuee modifiee.");
+    }
+
     private boolean conflit(Reservation reservation) {
         return reservationRepo.existsConflit(
                 reservation.getSalleId(),
@@ -221,6 +260,16 @@ public class ReservationService {
 
     private boolean creneauLibre(Integer salleId, LocalDateTime debut, LocalDateTime fin) {
         return !reservationRepo.existsConflit(salleId, debut, fin);
+    }
+
+    private void libererSalleSiPossible(Integer salleId) {
+        if (salleId == null || reservationRepo.existsBySalleIdAndStatut(salleId, STATUT_CONFIRMEE)) {
+            return;
+        }
+        salleRepo.findByIdForUpdate(salleId).ifPresent(salle -> {
+            salle.setDisponible(true);
+            salleRepo.save(salle);
+        });
     }
 
     private boolean correspondRecherche(ReservationView reservation, String recherche) {
