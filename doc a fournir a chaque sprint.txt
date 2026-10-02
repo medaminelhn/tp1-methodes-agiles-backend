@@ -1,0 +1,6 @@
+doc remplie sprint apres sprint contenant:
+- titre projet
+- eqipe scrum
+- roadmap (pour chaque sprint)
+- apres chaque sprint:
+etat du backlog, sprint backlog, l'increment, resume de chaque reunion d'un sprint, resultat du sprint
