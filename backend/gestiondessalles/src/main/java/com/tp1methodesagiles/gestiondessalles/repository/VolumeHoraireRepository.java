@@ -1,6 +1,6 @@
-package com.tp1methodesagiles.gestiondessalles.repository;
+package com.example.salles.repository;
 
-import com.tp1methodesagiles.gestiondessalles.entity.VolumeHoraire;
+import com.example.salles.entity.VolumeHoraire;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 

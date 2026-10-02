@@ -1,4 +1,4 @@
-package com.tp1methodesagiles.gestiondessalles.exception;
+package com.example.salles.exception;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;

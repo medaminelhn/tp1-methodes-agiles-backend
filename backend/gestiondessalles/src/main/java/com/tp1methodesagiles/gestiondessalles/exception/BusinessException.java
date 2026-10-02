@@ -1,4 +1,4 @@
-package com.tp1methodesagiles.gestiondessalles.exception;
+package com.example.salles.exception;
 
 public class BusinessException extends RuntimeException {
     public BusinessException(String message) {

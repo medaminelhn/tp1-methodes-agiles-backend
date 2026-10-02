@@ -1,4 +1,4 @@
-package com.tp1methodesagiles.gestiondessalles.entity;
+package com.example.salles.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;

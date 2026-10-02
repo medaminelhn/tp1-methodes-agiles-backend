@@ -1,11 +1,11 @@
-package com.tp1methodesagiles.gestiondessalles.controller;
+package com.example.salles.controller;
 
-import com.tp1methodesagiles.gestiondessalles.entity.Salle;
-import com.tp1methodesagiles.gestiondessalles.entity.Semestre;
-import com.tp1methodesagiles.gestiondessalles.entity.Utilisateur;
-import com.tp1methodesagiles.gestiondessalles.repository.SalleRepository;
-import com.tp1methodesagiles.gestiondessalles.repository.SemestreRepository;
-import com.tp1methodesagiles.gestiondessalles.repository.UtilisateurRepository;
+import com.example.salles.entity.Salle;
+import com.example.salles.entity.Semestre;
+import com.example.salles.entity.Utilisateur;
+import com.example.salles.repository.SalleRepository;
+import com.example.salles.repository.SemestreRepository;
+import com.example.salles.repository.UtilisateurRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

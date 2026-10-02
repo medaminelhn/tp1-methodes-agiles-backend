@@ -1,18 +1,23 @@
-package com.tp1methodesagiles.gestiondessalles.service;
+package com.example.salles.service;
 
-import com.tp1methodesagiles.gestiondessalles.dto.Creneau;
-import com.tp1methodesagiles.gestiondessalles.dto.ReservationRequest;
-import com.tp1methodesagiles.gestiondessalles.dto.Solde;
-import com.tp1methodesagiles.gestiondessalles.entity.Reservation;
-import com.tp1methodesagiles.gestiondessalles.entity.Salle;
-import com.tp1methodesagiles.gestiondessalles.entity.Semestre;
-import com.tp1methodesagiles.gestiondessalles.entity.VolumeHoraire;
-import com.tp1methodesagiles.gestiondessalles.exception.BusinessException;
-import com.tp1methodesagiles.gestiondessalles.repository.ReservationRepository;
-import com.tp1methodesagiles.gestiondessalles.repository.SalleRepository;
-import com.tp1methodesagiles.gestiondessalles.repository.SemestreRepository;
-import com.tp1methodesagiles.gestiondessalles.repository.UtilisateurRepository;
-import com.tp1methodesagiles.gestiondessalles.repository.VolumeHoraireRepository;
+import com.example.salles.dto.Creneau;
+import com.example.salles.dto.AlternativeReservation;
+import com.example.salles.dto.ReservationActionResponse;
+import com.example.salles.dto.ReservationRequest;
+import com.example.salles.dto.ReservationView;
+import com.example.salles.dto.SalleAffectationRequest;
+import com.example.salles.dto.Solde;
+import com.example.salles.entity.Reservation;
+import com.example.salles.entity.Salle;
+import com.example.salles.entity.Semestre;
+import com.example.salles.entity.Utilisateur;
+import com.example.salles.entity.VolumeHoraire;
+import com.example.salles.exception.BusinessException;
+import com.example.salles.repository.ReservationRepository;
+import com.example.salles.repository.SalleRepository;
+import com.example.salles.repository.SemestreRepository;
+import com.example.salles.repository.UtilisateurRepository;
+import com.example.salles.repository.VolumeHoraireRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,12 +25,17 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
 public class ReservationService {
 
     private static final int DUREE = 2;
+    private static final String STATUT_EN_ATTENTE = "EN_ATTENTE";
+    private static final String STATUT_CONFIRMEE = "CONFIRMEE";
+    private static final String STATUT_REFUSEE = "REFUSEE";
 
     private final UtilisateurRepository utilisateurRepo;
     private final SalleRepository salleRepo;
@@ -35,10 +45,28 @@ public class ReservationService {
 
     public Solde solde(Integer utilisateurId, Integer semestreId) {
         int consomme = (int) reservationRepo
-                .countByUtilisateurIdAndSemestreIdAndStatut(utilisateurId, semestreId, "CONFIRMEE") * DUREE;
+                .countByUtilisateurIdAndSemestreIdAndStatut(utilisateurId, semestreId, STATUT_CONFIRMEE) * DUREE;
         return volumeRepo.findByUtilisateurIdAndSemestreId(utilisateurId, semestreId)
                 .map(v -> new Solde(v.getVolumeHoraireTotal(), consomme, v.getVolumeHoraireTotal() - consomme))
                 .orElse(new Solde(null, consomme, null));
+    }
+
+    public List<ReservationView> rechercher(String recherche, String statut, Integer salleId,
+                                            Integer utilisateurId, Integer semestreId) {
+        return reservationRepo.findAll().stream()
+                .filter(r -> statut == null || statut.isBlank() || statut.equalsIgnoreCase(r.getStatut()))
+                .filter(r -> salleId == null || Objects.equals(salleId, r.getSalleId()))
+                .filter(r -> utilisateurId == null || Objects.equals(utilisateurId, r.getUtilisateurId()))
+                .filter(r -> semestreId == null || Objects.equals(semestreId, r.getSemestreId()))
+                .map(this::toView)
+                .filter(v -> correspondRecherche(v, recherche))
+                .toList();
+    }
+
+    public ReservationView detail(Integer id) {
+        return reservationRepo.findById(id)
+                .map(this::toView)
+                .orElseThrow(() -> new BusinessException("Reservation introuvable."));
     }
 
     @Transactional
@@ -97,81 +125,188 @@ public class ReservationService {
             r.setDateFin(fin);   // always +2h, matches check_duree_2h
             r.setMotif(req.commentaire());
             r.setMatiere(req.matiere());
-            r.setStatut("CONFIRMEE");
+            r.setStatut(STATUT_EN_ATTENTE);
             aCreer.add(r);
         }
         return reservationRepo.saveAll(aCreer);
     }
-    public List<Reservation> calendrier(Integer utilisateurId, Integer semestreId) {
-        utilisateurRepo.findById(utilisateurId)
-                .orElseThrow(() -> new BusinessException("Professeur introuvable."));
-        if (semestreId == null) {
-            return reservationRepo.findByUtilisateurIdOrderByDateDebutAsc(utilisateurId);
-        }
-        return reservationRepo.findByUtilisateurIdAndSemestreIdOrderByDateDebutAsc(
-                utilisateurId, semestreId);
-    }
-
-    public Reservation consulter(Integer utilisateurId, Integer reservationId) {
-        Reservation reservation = reservationRepo.findById(reservationId)
-                .orElseThrow(() -> new BusinessException("Réservation introuvable."));
-        verifierProprietaire(reservation, utilisateurId);
-        return reservation;
-    }
 
     @Transactional
-    public Reservation demanderAnnulation(Integer utilisateurId, Integer reservationId,
-                                           String commentaire) {
-        Reservation reservation = consulter(utilisateurId, reservationId);
-        verifierAucuneDemandeEnCours(reservation);
-        reservation.setDemandeType("ANNULATION");
-        reservation.setDemandeStatut("EN_ATTENTE");
-        reservation.setDemandeCommentaire(commentaire);
-        reservation.setDemandeSalleId(null);
-        reservation.setDemandeDateDebut(null);
-        reservation.setDemandeMatiere(null);
-        return reservationRepo.save(reservation);
-    }
-
-    @Transactional
-    public Reservation demanderModification(Integer utilisateurId, Integer reservationId,
-                                            com.tp1methodesagiles.gestiondessalles.dto.ReservationActionRequest req) {
-        Reservation reservation = consulter(utilisateurId, reservationId);
-        verifierAucuneDemandeEnCours(reservation);
-        if (req == null || req.debut() == null || req.salleId() == null) {
-            throw new BusinessException("La salle et la nouvelle date de début sont obligatoires.");
+    public ReservationActionResponse accepter(Integer reservationId) {
+        Reservation reservation = reservationRepo.findByIdForUpdate(reservationId)
+                .orElseThrow(() -> new BusinessException("Reservation introuvable."));
+        if (!STATUT_EN_ATTENTE.equalsIgnoreCase(reservation.getStatut())) {
+            throw new BusinessException("Seules les reservations en attente peuvent etre acceptees.");
         }
-        Salle salle = salleRepo.findById(req.salleId())
+
+        Salle salle = salleRepo.findByIdForUpdate(reservation.getSalleId())
                 .orElseThrow(() -> new BusinessException("Salle introuvable."));
-        if (!Boolean.TRUE.equals(salle.getDisponible())) {
-            throw new BusinessException("La salle " + salle.getNom() + " n'est pas disponible.");
+
+        if (!Boolean.TRUE.equals(salle.getDisponible()) || conflit(reservation)) {
+            AlternativeReservation alternative = trouverAlternative(reservation);
+            if (alternative == null) {
+                throw new BusinessException("Aucune salle disponible pour ce creneau.");
+            }
+            salle = salleRepo.findByIdForUpdate(alternative.salleId())
+                    .orElseThrow(() -> new BusinessException("Salle introuvable."));
+            if (!Boolean.TRUE.equals(salle.getDisponible())) {
+                throw new BusinessException("La salle alternative n'est plus disponible.");
+            }
+            reservation.setSalleId(salle.getId());
+            reservation.setDateDebut(alternative.debut());
+            reservation.setDateFin(alternative.fin());
         }
-        LocalDateTime fin = req.debut().plusHours(DUREE);
-        boolean sameSlot = reservation.getSalleId().equals(req.salleId())
-                && reservation.getDateDebut().equals(req.debut());
-        if (!sameSlot && reservationRepo.existsConflit(req.salleId(), req.debut(), fin)) {
-            throw new BusinessException("La salle " + salle.getNom()
-                    + " est déjà réservée sur le créneau demandé.");
+
+        if (conflit(reservation)) {
+            throw new BusinessException("Cette confirmation chevauche deja une reservation confirmee.");
         }
-        reservation.setDemandeType("MODIFICATION");
-        reservation.setDemandeStatut("EN_ATTENTE");
-        reservation.setDemandeCommentaire(req.commentaire());
-        reservation.setDemandeSalleId(req.salleId());
-        reservation.setDemandeDateDebut(req.debut());
-        reservation.setDemandeMatiere(req.matiere());
-        return reservationRepo.save(reservation);
+
+        reservation.setStatut(STATUT_CONFIRMEE);
+        salle.setDisponible(false);
+        salleRepo.save(salle);
+        return new ReservationActionResponse(
+                toView(reservationRepo.save(reservation)),
+                null,
+                "Reservation confirmee.");
     }
 
-    private void verifierProprietaire(Reservation reservation, Integer utilisateurId) {
-        if (!reservation.getUtilisateurId().equals(utilisateurId)) {
-            throw new BusinessException("Vous ne pouvez consulter ou modifier que vos propres réservations.");
+    @Transactional
+    public ReservationActionResponse refuser(Integer reservationId) {
+        Reservation reservation = reservationRepo.findByIdForUpdate(reservationId)
+                .orElseThrow(() -> new BusinessException("Reservation introuvable."));
+        if (STATUT_CONFIRMEE.equalsIgnoreCase(reservation.getStatut())) {
+            throw new BusinessException("Une reservation confirmee ne peut pas etre refusee.");
         }
+        AlternativeReservation alternative = trouverAlternative(reservation);
+        reservation.setStatut(STATUT_REFUSEE);
+        Reservation saved = reservationRepo.save(reservation);
+        String message = alternative == null
+                ? "Reservation refusee. Aucun alternatif disponible avec les donnees actuelles."
+                : "Reservation refusee. Un alternatif est disponible.";
+        return new ReservationActionResponse(toView(saved), alternative, message);
     }
 
-    private void verifierAucuneDemandeEnCours(Reservation reservation) {
-        if ("EN_ATTENTE".equals(reservation.getDemandeStatut())) {
-            throw new BusinessException("Une demande est déjà en attente pour cette réservation.");
+    @Transactional
+    public ReservationActionResponse modifierSalle(Integer reservationId, SalleAffectationRequest req) {
+        if (req.salleId() == null) {
+            throw new BusinessException("Selectionnez une salle.");
         }
+
+        Reservation reservation = reservationRepo.findByIdForUpdate(reservationId)
+                .orElseThrow(() -> new BusinessException("Reservation introuvable."));
+        if (STATUT_REFUSEE.equalsIgnoreCase(reservation.getStatut())) {
+            throw new BusinessException("La salle d'une reservation refusee ne peut pas etre modifiee.");
+        }
+        if (Objects.equals(reservation.getSalleId(), req.salleId())) {
+            return new ReservationActionResponse(toView(reservation), null, "La reservation utilise deja cette salle.");
+        }
+
+        Integer ancienneSalleId = reservation.getSalleId();
+        Salle nouvelleSalle = salleRepo.findByIdForUpdate(req.salleId())
+                .orElseThrow(() -> new BusinessException("Salle introuvable."));
+        if (!Boolean.TRUE.equals(nouvelleSalle.getDisponible())) {
+            throw new BusinessException("La salle " + nouvelleSalle.getNom() + " n'est pas disponible.");
+        }
+        if (reservationRepo.existsConflitExcluding(req.salleId(), reservation.getDateDebut(),
+                reservation.getDateFin(), reservation.getId())) {
+            throw new BusinessException("Cette salle a deja une reservation confirmee sur ce creneau.");
+        }
+
+        reservation.setSalleId(req.salleId());
+        Reservation saved = reservationRepo.save(reservation);
+
+        if (STATUT_CONFIRMEE.equalsIgnoreCase(saved.getStatut())) {
+            nouvelleSalle.setDisponible(false);
+            salleRepo.save(nouvelleSalle);
+            libererSalleSiPossible(ancienneSalleId);
+        }
+
+        return new ReservationActionResponse(toView(saved), null, "Salle attribuee modifiee.");
     }
 
+    private boolean conflit(Reservation reservation) {
+        return reservationRepo.existsConflit(
+                reservation.getSalleId(),
+                reservation.getDateDebut(),
+                reservation.getDateFin());
+    }
+
+    private AlternativeReservation trouverAlternative(Reservation reservation) {
+        for (Salle salle : salleRepo.findAll()) {
+            if (!Boolean.TRUE.equals(salle.getDisponible())) {
+                continue;
+            }
+            if (Objects.equals(salle.getId(), reservation.getSalleId())) {
+                continue;
+            }
+            if (creneauLibre(salle.getId(), reservation.getDateDebut(), reservation.getDateFin())) {
+                return new AlternativeReservation(salle.getId(), salle.getNom(),
+                        reservation.getDateDebut(), reservation.getDateFin());
+            }
+        }
+
+        LocalDateTime debut = reservation.getDateDebut().plusHours(DUREE);
+        for (int i = 0; i < 8; i++) {
+            LocalDateTime fin = debut.plusHours(DUREE);
+            for (Salle salle : salleRepo.findAll()) {
+                if (Boolean.TRUE.equals(salle.getDisponible()) && creneauLibre(salle.getId(), debut, fin)) {
+                    return new AlternativeReservation(salle.getId(), salle.getNom(), debut, fin);
+                }
+            }
+            debut = debut.plusHours(DUREE);
+        }
+        return null;
+    }
+
+    private boolean creneauLibre(Integer salleId, LocalDateTime debut, LocalDateTime fin) {
+        return !reservationRepo.existsConflit(salleId, debut, fin);
+    }
+
+    private void libererSalleSiPossible(Integer salleId) {
+        if (salleId == null || reservationRepo.existsBySalleIdAndStatut(salleId, STATUT_CONFIRMEE)) {
+            return;
+        }
+        salleRepo.findByIdForUpdate(salleId).ifPresent(salle -> {
+            salle.setDisponible(true);
+            salleRepo.save(salle);
+        });
+    }
+
+    private boolean correspondRecherche(ReservationView reservation, String recherche) {
+        if (recherche == null || recherche.isBlank()) {
+            return true;
+        }
+        String texte = recherche.toLowerCase(Locale.ROOT);
+        return contient(reservation.professeurNom(), texte)
+                || contient(reservation.salleNom(), texte)
+                || contient(reservation.matiere(), texte)
+                || contient(reservation.motif(), texte)
+                || contient(reservation.statut(), texte);
+    }
+
+    private boolean contient(String valeur, String recherche) {
+        return valeur != null && valeur.toLowerCase(Locale.ROOT).contains(recherche);
+    }
+
+    private ReservationView toView(Reservation reservation) {
+        Salle salle = salleRepo.findById(reservation.getSalleId()).orElse(null);
+        Utilisateur utilisateur = utilisateurRepo.findById(reservation.getUtilisateurId()).orElse(null);
+        String professeur = utilisateur == null
+                ? "Professeur #" + reservation.getUtilisateurId()
+                : utilisateur.getPrenom() + " " + utilisateur.getNom();
+        return new ReservationView(
+                reservation.getId(),
+                reservation.getSalleId(),
+                salle == null ? "Salle #" + reservation.getSalleId() : salle.getNom(),
+                reservation.getUtilisateurId(),
+                professeur,
+                reservation.getSemestreId(),
+                reservation.getDateDebut(),
+                reservation.getDateFin(),
+                0,
+                reservation.getMatiere(),
+                reservation.getMotif(),
+                reservation.getStatut(),
+                reservation.getDateCreation());
+    }
 }

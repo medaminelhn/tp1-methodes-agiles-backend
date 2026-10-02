@@ -1,6 +1,6 @@
-package com.tp1methodesagiles.gestiondessalles.repository;
+package com.example.salles.repository;
 
-import com.tp1methodesagiles.gestiondessalles.entity.Semestre;
+import com.example.salles.entity.Semestre;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SemestreRepository extends JpaRepository<Semestre, Integer> {

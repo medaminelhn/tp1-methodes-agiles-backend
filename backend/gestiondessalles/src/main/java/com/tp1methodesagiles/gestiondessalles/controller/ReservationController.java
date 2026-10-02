@@ -1,17 +1,25 @@
-package com.tp1methodesagiles.gestiondessalles.controller;
+package com.example.salles.controller;
 
-import com.tp1methodesagiles.gestiondessalles.dto.CalendrierItem;
-import com.tp1methodesagiles.gestiondessalles.dto.ReservationActionRequest;
-import com.tp1methodesagiles.gestiondessalles.dto.ReservationRequest;
-import com.tp1methodesagiles.gestiondessalles.dto.Solde;
-import com.tp1methodesagiles.gestiondessalles.entity.Reservation;
-import com.tp1methodesagiles.gestiondessalles.service.ReservationService;
+import com.example.salles.dto.ReservationRequest;
+import com.example.salles.dto.ReservationActionResponse;
+import com.example.salles.dto.ReservationView;
+import com.example.salles.dto.SalleAffectationRequest;
+import com.example.salles.dto.Solde;
+import com.example.salles.entity.Reservation;
+import com.example.salles.service.ReservationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
@@ -25,39 +33,39 @@ public class ReservationController {
         return service.solde(utilisateurId, semestreId);
     }
 
+    @GetMapping("/reservations")
+    public List<ReservationView> reservations(@RequestParam(required = false) String recherche,
+                                              @RequestParam(required = false) String statut,
+                                              @RequestParam(required = false) Integer salleId,
+                                              @RequestParam(required = false) Integer utilisateurId,
+                                              @RequestParam(required = false) Integer semestreId) {
+        return service.rechercher(recherche, statut, salleId, utilisateurId, semestreId);
+    }
+
+    @GetMapping("/reservations/{id}")
+    public ReservationView reservation(@PathVariable Integer id) {
+        return service.detail(id);
+    }
+
     @PostMapping("/reservations")
     @ResponseStatus(HttpStatus.CREATED)
     public List<Reservation> creer(@RequestBody ReservationRequest req) {
         return service.creer(req);
     }
 
-    @GetMapping("/calendrier")
-    public List<CalendrierItem> calendrier(@RequestParam Integer utilisateurId,
-                                           @RequestParam(required = false) Integer semestreId) {
-        return service.calendrier(utilisateurId, semestreId)
-                .stream()
-                .map(CalendrierItem::from)
-                .collect(Collectors.toList());
+    @PatchMapping("/reservations/{id}/accepter")
+    public ReservationActionResponse accepter(@PathVariable Integer id) {
+        return service.accepter(id);
     }
 
-    @GetMapping("/reservations/{reservationId}")
-    public Reservation consulter(@PathVariable Integer reservationId,
-                                  @RequestParam Integer utilisateurId) {
-        return service.consulter(utilisateurId, reservationId);
+    @PatchMapping("/reservations/{id}/refuser")
+    public ReservationActionResponse refuser(@PathVariable Integer id) {
+        return service.refuser(id);
     }
 
-    @PostMapping("/reservations/{reservationId}/annulation")
-    public Reservation demanderAnnulation(@PathVariable Integer reservationId,
-                                          @RequestParam Integer utilisateurId,
-                                          @RequestBody(required = false) ReservationActionRequest req) {
-        return service.demanderAnnulation(
-                utilisateurId, reservationId, req == null ? null : req.commentaire());
-    }
-
-    @PostMapping("/reservations/{reservationId}/modification")
-    public Reservation demanderModification(@PathVariable Integer reservationId,
-                                            @RequestParam Integer utilisateurId,
-                                            @RequestBody ReservationActionRequest req) {
-        return service.demanderModification(utilisateurId, reservationId, req);
+    @PatchMapping("/reservations/{id}/salle")
+    public ReservationActionResponse modifierSalle(@PathVariable Integer id,
+                                                   @RequestBody SalleAffectationRequest req) {
+        return service.modifierSalle(id, req);
     }
 }

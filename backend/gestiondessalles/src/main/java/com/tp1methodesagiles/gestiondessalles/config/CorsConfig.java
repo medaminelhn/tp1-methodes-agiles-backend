@@ -1,4 +1,4 @@
-package com.tp1methodesagiles.gestiondessalles.config;
+package com.example.salles.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
