@@ -1,0 +1,5 @@
+ALTER TABLE reservations
+    ADD COLUMN IF NOT EXISTS matiere VARCHAR(150);
+
+ALTER TABLE reservations
+    ALTER COLUMN statut SET DEFAULT 'EN_ATTENTE';
